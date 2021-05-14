@@ -28,7 +28,7 @@ type Block struct {
 	Hash          []byte
 	Nonce         int
 }
-type Blockchain struct {
+type BlockChain struct {
 	blocks []*Block
 }
 func NewProofOfWork(b *Block) *ProofOfWork {
@@ -100,7 +100,7 @@ func (pow *ProofOfWork) Validate() bool {
 	hash := sha256.Sum256(data)
 	hashInt.SetBytes(hash[:])
 
-	isValid = hashInt.Cmp(pow.target) == -1
+	isValid := hashInt.Cmp(pow.target) == -1
 	return isValid
 }
 
@@ -108,13 +108,16 @@ func NewGenesisBlock() *Block {
 	return NewBlock("Genesis Block", []byte{})
 }
 
-func NewBlockchain() *Blockchain {
+func NewBlockchain() *BlockChain {
 	return &BlockChain{[]*Block{NewGenesisBlock()}}
 }
 
 func main() {
-
-	for _, block := range bc.blocks {
+	chain:=NewBlockchain()
+	chain.AddBlock("1 coin")
+	chain.AddBlock("2 coin")
+	chain.AddBlock("3 coin")
+	for _, block := range chain.blocks {
 
 			pow := NewProofOfWork(block)
 			fmt.Printf("PoW: %s\n", strconv.FormatBool(pow.Validate()))
