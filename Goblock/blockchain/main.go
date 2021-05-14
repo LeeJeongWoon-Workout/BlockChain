@@ -9,20 +9,22 @@ import (
 	"math/big"
 	"math"
 )
-const Difficulty=16
 
-func IntToHex(n int64) []byte {
+const targetBits=24
+
+func IntToHex(n int64) []byte{
 	return []byte(strconv.FormatInt(n,16))
 }
+
 type Block struct {
-	Data []byte
-	Hash []byte
-	PrevHash []byte
-	nonce int64
-	TS int64
+	Timestamp     int64
+	Data          []byte
+	PrevBlockHash []byte
+	Hash          []byte
+	Nonce		int64
 }
 
-type BlockChain struct {
+type Blockchain struct {
 	blocks []*Block
 }
 
@@ -31,74 +33,90 @@ type ProofOfWork struct {
 	target *big.Int
 }
 
-func NewProofOfWork(b *Block)*ProofOfWork {
-	target:=big.NewInt(1)
-	target.Lsh(target,256-Difficulty)
-	return &ProofOfWork{b,target}
+func NewProofOfWork(b *Block) *ProofOfWork {
+	target := big.NewInt(1)
+	target.Lsh(target, uint(256-targetBits))
+
+	pow := &ProofOfWork{b, target}
+	return pow
 }
 
-func (pow *ProofOfWork) PrePareData(nonce int64) []byte {
-	data:=bytes.Join([][]byte{
-		pow.block.Data,
-		pow.block.PrevHash,
-		IntToHex(nonce),
-		IntToHex(pow.block.TS),
-		IntToHex(int64(Difficulty))},[]byte{})
-
+func (pow *ProofOfWork) prepareData(nonce int64) []byte {
+	data := bytes.Join(
+			[][]byte{
+					pow.block.PrevBlockHash,
+					pow.block.Data,
+					IntToHex(pow.block.Timestamp),
+					IntToHex(int64(targetBits)),
+					IntToHex(int64(nonce)),
+			},
+			[]byte{},
+	)
 	return data
 }
 
-func (pow *ProofOfWork)Run() (int64,[]byte) {
-	var nonce int64
+
+
+func (pow *ProofOfWork) Run() (int64, []byte) {
 	var hashInt big.Int
 	var hash [32]byte
-
+	var nonce int64
 	nonce=0
 
-	for nonce<math.MaxInt64 {
-		data:=pow.PrePareData(nonce)
-		hash=sha256.Sum256(data)
-		hashInt.SetBytes(hash[:])
-		if hashInt.Cmp(pow.target)==-1 {
-			break
-		}
-		nonce++
+	fmt.Printf("Mining the block containing \"%s\"\n", pow.block.Data)
+
+	for nonce < math.MaxInt64 {
+			data := pow.prepareData(nonce)
+			hash = sha256.Sum256(data)
+			fmt.Printf("\r%x", hash)
+
+			hashInt.SetBytes(hash[:])
+			if hashInt.Cmp(pow.target) == -1 {
+					break
+			} else {
+					nonce++
+			}
 	}
-	return nonce,hash[:]
+	fmt.Print("\n\n")
+
+	return nonce, hash[:]
 }
 
-func CreateBlock(data string,prevhash []byte) *Block {
-	block:=&Block{[]byte(data),[]byte{},prevhash,0,time.Hour.Microseconds()}
-	pow:=NewProofOfWork(block)
-	block.nonce,block.Hash=pow.Run()
+func NewBlock(data string, prevBlockHash []byte) *Block {
+	block := &Block{time.Now().Unix(), []byte(data), prevBlockHash, []byte{}, 0}
+	pow := NewProofOfWork(block)
+	nonce, hash := pow.Run()
+
+	block.Hash = hash[:]
+	block.Nonce = nonce
 	return block
 }
 
-func (chain *BlockChain) AddBlock(data string) {
-	prev:=chain.blocks[len(chain.blocks)-1]
-	new:=CreateBlock(data,prev.Hash)
-	chain.blocks=append(chain.blocks,new)
+func (bc *Blockchain) AddBlock(data string) {
+	prevBlock := bc.blocks[len(bc.blocks)-1]
+	newBlock := NewBlock(data, prevBlock.Hash)
+	bc.blocks = append(bc.blocks, newBlock)
 }
 
-func Racoon() *Block{
-	return CreateBlock("Racoon",[]byte{})
+func NewracoonBlock() *Block {
+	return NewBlock("Racoon coin", []byte{})
 }
 
-func InitBlockChain() *BlockChain{
-	return &BlockChain{[]*Block{Racoon()}}
+func NewBlockchain() *Blockchain {
+	return &Blockchain{[]*Block{NewracoonBlock()}}
 }
 
 func main() {
-	chain:=InitBlockChain()
+	bc := NewBlockchain()
 
-	chain.AddBlock("Ivan 1 coin")
-	chain.AddBlock("Fermat 3 coin")
+	bc.AddBlock("Send 1 BTC to Ivan")
+	bc.AddBlock("Send 2 more BTC to Ivan")
 
-	for _,block :=range chain.blocks {
-		fmt.Printf("PrevHash: %x\n",block.PrevHash)
-		fmt.Printf("Data: %s\n",block.Data)
-		fmt.Printf("nonce: %d\n",block.nonce)
-
-		fmt.Printf("\n")
+	for _, block := range bc.blocks {
+			fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
+			fmt.Printf("Data: %s\n", block.Data)
+			fmt.Printf("Hash: %x\n", block.Hash)
+			fmt.Printf("nonce: %d\n",block.Nonce)
+			fmt.Println()
 	}
 }
